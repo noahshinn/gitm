@@ -5,5 +5,6 @@ pub mod llm;
 pub mod prompts;
 pub mod rankers;
 pub mod retrievers;
+pub mod search_agent;
 pub mod store;
 pub mod utils;

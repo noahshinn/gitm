@@ -1,6 +1,5 @@
 use crate::llm::{
-    get_chat_completion, ChatError, ChatModel, Function, Message, Parameters, Property, Role, Tool,
-    ToolCall,
+    ChatError, ChatModel, Function, Message, Parameters, Property, Role, Tool, ToolCall,
 };
 use crate::prompts::BASE_CONTEXT_PROMPT;
 use serde::{Deserialize, Serialize};
@@ -13,19 +12,17 @@ pub enum ClassificationType {
 }
 
 pub trait Classifier<T> {
-    fn classify(&self) -> impl Future<Output = Result<T, ChatError>> + Send;
+    fn classify(&self, query: String) -> impl Future<Output = Result<T, ChatError>> + Send;
 }
 
 pub struct MentionClassifier {
     model: ChatModel,
-    api_key: String,
-    query: String,
     kind: MentionKind,
 }
 
 pub enum MentionKind {
     Author,
-    Since,
+    DateTime,
 }
 
 const BINARY_CLASSIFICATION_SYSTEM_PROMPT: &str = r#"# Task
@@ -34,18 +31,8 @@ You will be given a user query, an instruction, and a tool call output format to
 Your job is to read the relevant context, submit your answer to the instruction in the tool call format."#;
 
 impl MentionClassifier {
-    pub fn new(
-        model: ChatModel,
-        api_key: String,
-        query: String,
-        kind: MentionKind,
-    ) -> MentionClassifier {
-        MentionClassifier {
-            model,
-            api_key,
-            query,
-            kind,
-        }
+    pub fn new(model: ChatModel, kind: MentionKind) -> MentionClassifier {
+        MentionClassifier { model, kind }
     }
 }
 
@@ -56,7 +43,7 @@ pub struct MentionResult {
 }
 
 impl Classifier<MentionResult> for MentionClassifier {
-    async fn classify(&self) -> Result<MentionResult, ChatError> {
+    async fn classify(&self, query: String) -> Result<MentionResult, ChatError> {
         let instruction: String;
         let classifier_name: String;
         match self.kind {
@@ -66,7 +53,7 @@ impl Classifier<MentionResult> for MentionClassifier {
                 );
                 classifier_name = String::from("author_mention_classifier");
             }
-            MentionKind::Since => {
+            MentionKind::DateTime => {
                 instruction =
                     String::from("Determine if the user's query is trying to filter by the date.");
                 classifier_name = String::from("date_mention_classifier");
@@ -111,17 +98,11 @@ impl Classifier<MentionResult> for MentionClassifier {
             },
             Message {
                 role: Role::User,
-                content: format!("# User query\n{}", self.query),
+                content: format!("# User query\n{}", query),
                 tool_call_id: None,
             },
         ];
-        let response = get_chat_completion(
-            messages,
-            Some(vec![tool]),
-            self.model.clone(),
-            &self.api_key,
-        )
-        .await;
+        let response = self.model.chat(messages, Some(vec![tool]), 0.0).await;
         let tool_call: ToolCall = match response {
             Ok(response) => {
                 let choice = &response.choices[0];
