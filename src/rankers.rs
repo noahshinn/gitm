@@ -5,7 +5,7 @@ pub trait Ranker<T> {
         &self,
         query: T,
         corpus: Vec<T>,
-        max_num_docs: Option<usize>,
+        max_num_results: Option<usize>,
     ) -> Result<Vec<RankingResult<T>>, Box<dyn std::error::Error>>
     where
         T: Display + Clone;
@@ -16,7 +16,7 @@ where
     T: Display + Clone,
 {
     pub score: f64,
-    pub doc: T,
+    pub item: T,
 }
 
 impl<T> PartialOrd for RankingResult<T>

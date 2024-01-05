@@ -1,4 +1,6 @@
 use crate::rankers::{Ranker, RankingResult};
+use crate::retrievers::Retriever;
+use crate::store::Store;
 use std::collections::BinaryHeap;
 use std::fmt::Display;
 
@@ -59,7 +61,11 @@ impl<T> BM25Ranker<T>
 where
     T: Display + Clone,
 {
-    pub fn new() -> BM25RankerBuilder<T> {
+    pub fn new() -> BM25Ranker<T> {
+        BM25Ranker::builder().build()
+    }
+
+    pub fn builder() -> BM25RankerBuilder<T> {
         BM25RankerBuilder::new()
     }
 
@@ -136,7 +142,7 @@ impl<T> Ranker<T> for BM25Ranker<T> {
             );
             heap.push(RankingResult {
                 score,
-                doc: doc.clone(),
+                item: doc.clone(),
             });
         }
         let mut ranked_results = Vec::<RankingResult<T>>::new();
@@ -171,4 +177,75 @@ where
     }
     let n_q = n_q as f64;
     ((n - n_q + 0.5) / (n_q + 0.5) + 1.0).ln()
+}
+
+pub struct BM25Retriever<T>
+where
+    T: Display + Clone,
+{
+    ranker: BM25Ranker<T>,
+}
+
+pub struct BM25RetrieverBuilder<T>
+where
+    T: Display + Clone,
+{
+    ranker: Option<BM25Ranker<T>>,
+}
+
+impl<T> BM25Retriever<T>
+where
+    T: Display + Clone,
+{
+    pub fn new() -> Self {
+        Self {
+            ranker: BM25Ranker::<T>::builder().build(),
+        }
+    }
+
+    pub fn builder() -> BM25RetrieverBuilder<T> {
+        BM25RetrieverBuilder::new()
+    }
+}
+
+impl<T> BM25RetrieverBuilder<T>
+where
+    T: Display + Clone,
+{
+    pub fn new() -> Self {
+        Self { ranker: None }
+    }
+
+    pub fn ranker(mut self, ranker: BM25Ranker<T>) -> Self {
+        self.ranker = Some(ranker);
+        self
+    }
+
+    pub fn build(self) -> BM25Retriever<T> {
+        BM25Retriever {
+            ranker: match self.ranker {
+                Some(ranker) => ranker,
+                None => BM25Ranker::<T>::builder().build(),
+            },
+        }
+    }
+}
+
+impl<T> Retriever<T> for BM25Retriever<T>
+where
+    T: Display + Clone,
+{
+    fn retrieve(
+        &self,
+        query: T,
+        store: Store<T>,
+        max_num_results: usize,
+    ) -> Result<Vec<T>, Box<dyn std::error::Error>> {
+        let ranked_results = self.ranker.rank(query, store.data, Some(max_num_results))?;
+        let mut results = Vec::new();
+        for result in ranked_results {
+            results.push(result.item);
+        }
+        Ok(results)
+    }
 }

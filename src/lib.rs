@@ -4,4 +4,6 @@ pub mod git;
 pub mod llm;
 pub mod prompts;
 pub mod rankers;
+pub mod retrievers;
+pub mod store;
 pub mod utils;
