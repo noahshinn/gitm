@@ -1,0 +1,15 @@
+[package]
+name = "gitm"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "gitm"
+
+[dependencies]
+clap = { version = "4.4.12", features = ["derive"] }
+reqwest = { version = "0.11", features = ["json"] }
+tokio = { version = "1", features = ["full"] }
+serde_json = "1.0"
+serde = { version = "1.0.194", features = ["derive"] }
+chrono = "0.4.31"
