@@ -59,12 +59,3 @@ where
         }
     }
 }
-
-impl From<Vec<&str>> for Store<String> {
-    fn from(data: Vec<&str>) -> Self {
-        Self {
-            mu: Mutex::new(()),
-            data: data.iter().map(|s| s.to_string()).collect(),
-        }
-    }
-}

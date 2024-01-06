@@ -1,9 +1,10 @@
 use chrono::{DateTime, Utc};
+use std::fmt::{Display, Formatter};
 use std::process::Command;
 
 pub struct Client;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Commit {
     pub author: Author,
     pub date: DateTime<Utc>,
@@ -11,13 +12,19 @@ pub struct Commit {
     pub sha: String,
 }
 
-#[derive(Debug)]
+impl Display for Commit {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}\n\n{}", self.message.title, self.message.body)
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct CommitMessage {
     pub title: String,
     pub body: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Author {
     pub name: String,
     pub email: Option<String>,

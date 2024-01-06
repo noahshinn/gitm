@@ -1,7 +1,8 @@
 use clap::Parser;
 use gitm::bm25::BM25Retriever;
-use gitm::retrievers::Retriever;
-use gitm::store::Store;
+use gitm::git::Client;
+use gitm::llm::ChatModel;
+use gitm::llm::ChatModelKey::Gpt4;
 use gitm::utils::does_valid_git_dir_exist;
 
 #[derive(Parser, Debug)]
@@ -20,24 +21,17 @@ fn get_args() -> Result<Args, Box<dyn std::error::Error>> {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // let args = get_args().unwrap();
+    let args = get_args().unwrap();
     if !does_valid_git_dir_exist()? {
         println!("Not a valid git directory");
         return Ok(());
     }
-    // let client = Client::new();
-    let corpus = vec![
-        "Germany was founded in 1871",
-        "Apples fall downwards",
-        "What happened to Alan Turing?",
-        "Google is searching for answers",
-        "When was the first computer invented?",
-    ];
-    let store = Store::from(corpus);
+    let client = Client::new();
     let retriever = BM25Retriever::new();
-    let retrieved_results =
-        retriever.retrieve(String::from("some search about germany"), store, 2)?;
-    for result in retrieved_results {
+    let model = ChatModel::new(args.api_key, Gpt4);
+    let search_agent = gitm::search_agent::SearchAgent::new(client, &retriever, model);
+    let results = search_agent.search(args.query, 10).await;
+    for result in results {
         println!("{}", result);
     }
     Ok(())

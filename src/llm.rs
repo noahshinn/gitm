@@ -9,6 +9,10 @@ pub struct ChatModel {
 }
 
 impl ChatModel {
+    pub fn new(api_key: String, model_key: ChatModelKey) -> Self {
+        Self { api_key, model_key }
+    }
+
     pub async fn chat(
         &self,
         messages: Vec<Message>,

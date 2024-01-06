@@ -1,14 +1,14 @@
 use std::fmt::Display;
 
-pub trait Ranker<T> {
+pub trait Ranker<T, U> {
     fn rank(
         &self,
         query: T,
-        corpus: Vec<T>,
-        max_num_results: Option<usize>,
-    ) -> Result<Vec<RankingResult<T>>, Box<dyn std::error::Error>>
+        corpus: Vec<U>,
+    ) -> Result<Vec<RankingResult<U>>, Box<dyn std::error::Error>>
     where
-        T: Display + Clone;
+        T: Display + Clone,
+        U: Display + Clone;
 }
 
 pub struct RankingResult<T>
