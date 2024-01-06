@@ -8,20 +8,15 @@ pub struct Client;
 pub struct Commit {
     pub author: Author,
     pub date: DateTime<Utc>,
-    pub message: CommitMessage,
+    pub title: String,
+    pub body: String,
     pub sha: String,
 }
 
 impl Display for Commit {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}\n\n{}", self.message.title, self.message.body)
+        write!(f, "{}\n\n{}", self.title, self.body)
     }
-}
-
-#[derive(Debug, Clone)]
-pub struct CommitMessage {
-    pub title: String,
-    pub body: String,
 }
 
 #[derive(Debug, Clone)]
@@ -59,7 +54,7 @@ impl Client {
                 email => Some(email.to_string()),
             };
             let date_raw = parts.next().unwrap().to_string();
-            let subject = parts.next().unwrap().to_string();
+            let title = parts.next().unwrap().to_string();
             let body = parts.next().unwrap().to_string();
             let sha = parts.next().unwrap().to_string();
             let date = DateTime::parse_from_rfc2822(&date_raw)?.with_timezone(&Utc);
@@ -70,10 +65,8 @@ impl Client {
                     email: author_email,
                 },
                 date,
-                message: CommitMessage {
-                    title: subject,
-                    body,
-                },
+                title,
+                body,
                 sha,
             })
         }
