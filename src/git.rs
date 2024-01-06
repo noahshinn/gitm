@@ -26,7 +26,8 @@ pub struct CommitMessage {
 
 #[derive(Debug, Clone)]
 pub struct Author {
-    pub name: String,
+    pub name: Option<String>,
+    pub username: Option<String>,
     pub email: Option<String>,
 }
 
@@ -64,7 +65,8 @@ impl Client {
             let date = DateTime::parse_from_rfc2822(&date_raw)?.with_timezone(&Utc);
             commits.push(Commit {
                 author: Author {
-                    name: author_name,
+                    name: Some(author_name),
+                    username: None,
                     email: author_email,
                 },
                 date,
@@ -99,7 +101,11 @@ impl Client {
                 "" => None,
                 email => Some(email.to_string()),
             };
-            authors.push(Author { name, email });
+            authors.push(Author {
+                name: Some(name),
+                username: None,
+                email,
+            });
         }
         Ok(authors)
     }

@@ -1,6 +1,7 @@
 pub mod bm25;
 pub mod classifier;
 pub mod git;
+pub mod github;
 pub mod llm;
 pub mod mention_classifiers;
 pub mod prompts;

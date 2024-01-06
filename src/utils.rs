@@ -25,3 +25,10 @@ pub fn does_valid_git_dir_exist() -> Result<bool, Box<dyn std::error::Error>> {
         Err(_) => return Ok(false),
     }
 }
+
+pub fn does_command_exist(command: &str) -> Result<bool, Box<dyn std::error::Error>> {
+    match Command::new("which").arg(command).output() {
+        Ok(output) => Ok(output.status.success() && !String::from_utf8(output.stdout)?.is_empty()),
+        Err(err) => Err(Box::new(err)),
+    }
+}
