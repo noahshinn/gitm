@@ -54,7 +54,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
     let results = search_agent.search(args.query, 10, mode).await.unwrap();
     for result in results.0 {
-        println!("commit: {}", result.title);
+        println!("commit: {}", result.patch_set);
     }
     for result in results.1 {
         println!("issue: {}", result.title);

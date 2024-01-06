@@ -1,6 +1,7 @@
 use chrono::{DateTime, Utc};
 use std::fmt::{Display, Formatter};
 use std::process::Command;
+use unidiff::PatchSet;
 
 pub struct Client;
 
@@ -11,6 +12,7 @@ pub struct Commit {
     pub title: String,
     pub body: String,
     pub sha: String,
+    pub patch_set: PatchSet,
 }
 
 impl Display for Commit {
@@ -37,14 +39,24 @@ impl Client {
 
     pub fn get_all_commits(&self) -> Result<Vec<Commit>, Box<dyn std::error::Error>> {
         let format = format!("--pretty=format:{}", GIT_LOG_PARSE_FIELDS.join(DELIMITER));
-        let output = Command::new("git").arg("log").arg(format).output()?;
+        let output = Command::new("git")
+            .arg("log")
+            .arg("-uz")
+            .arg(format)
+            .output()?;
         if !output.status.success() {
             return Err("Failed to get git log".into());
         }
         let stdout = String::from_utf8(output.stdout)?;
         let mut commits = Vec::new();
-        for line in stdout.lines() {
-            let mut parts = line.split(DELIMITER);
+        for commit_data in stdout.split("\0") {
+            let (udiff_strings, remaining_log) = split_raw_git_log_output(commit_data.to_string());
+            if udiff_strings.is_empty() || remaining_log.is_empty() {
+                continue;
+            }
+            let mut patch_set = PatchSet::new();
+            patch_set.parse(udiff_strings.join("\n")).unwrap();
+            let mut parts = remaining_log.split(DELIMITER);
             if parts.clone().count() != GIT_LOG_PARSE_FIELDS.len() {
                 continue;
             }
@@ -68,6 +80,7 @@ impl Client {
                 title,
                 body,
                 sha,
+                patch_set,
             })
         }
         commits.reverse();
@@ -102,4 +115,31 @@ impl Client {
         }
         Ok(authors)
     }
+}
+
+fn split_raw_git_log_output(s: String) -> (Vec<String>, String) {
+    let mut udiff_strings = Vec::new();
+    let mut current_udiff = String::new();
+    let mut in_udiff = false;
+    let mut remaining_log = String::new();
+    for line in s.lines() {
+        if line.starts_with("diff --git") {
+            if in_udiff && !current_udiff.is_empty() {
+                udiff_strings.push(current_udiff.clone());
+                current_udiff.clear();
+            }
+            in_udiff = true;
+        }
+        if in_udiff {
+            current_udiff.push_str(line);
+            current_udiff.push('\n');
+        } else {
+            remaining_log.push_str(line);
+            remaining_log.push('\n');
+        }
+    }
+    if in_udiff && !current_udiff.is_empty() {
+        udiff_strings.push(current_udiff);
+    }
+    (udiff_strings, remaining_log)
 }
