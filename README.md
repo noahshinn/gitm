@@ -18,10 +18,16 @@ Build and move the binary to /usr/local/bin
 sudo make
 ```
 
+Set your OpenAI API key (or pass it to the binary with the `--api-key` flag)
+
+```bash
+export OPENAI_API_KEY="<your key>"
+```
+
 Run a search over your commits
 
 ```bash
-gitm --query "your query" --api-key <your OpenAI key>
+gitm "<your query>"
 ```
 
 Other options
@@ -30,3 +36,4 @@ Other options
 - `--issues-too`: Run a joint search over commits and issues.
 - `--include-code-patches`: Use code diffs from commit patches during search.
 - `--disable-classifications`: By default, your query will be parsed for potential filters (expressed in natural language). Set this flag to disable these checks.
+- `--api-key`: An OpenAI API key to use.

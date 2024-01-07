@@ -3,31 +3,62 @@ use gitm::llm::ChatModel;
 use gitm::llm::ChatModelKey::Gpt4;
 use gitm::search_agent::SearchConfigBuilder;
 use gitm::utils::{does_command_exist, does_valid_git_dir_exist};
+use std::env;
 
 #[derive(Parser, Debug)]
+#[clap(
+    name = "gitm",
+    about = "A command line tool for searching through GitHub issues, commit messages, and code patches."
+)]
 struct Args {
-    #[arg(short, long)]
     query: String,
 
-    #[arg(long)]
+    #[arg(long, default_value = "", help = "OpenAI API key")]
     api_key: String,
 
-    #[arg(long, default_value = "false")]
+    #[arg(
+        long,
+        default_value = "false",
+        help = "If set, only GitHub issues will be searched"
+    )]
     issues_only: bool,
 
-    #[arg(long, default_value = "false")]
+    #[arg(
+        long,
+        default_value = "false",
+        help = "If set, GitHub issues will be searched"
+    )]
     issues_too: bool,
 
-    #[arg(long, default_value = "false")]
+    #[arg(
+        long,
+        default_value = "false",
+        help = "If set, code patches will be included in the search"
+    )]
     include_code_patches: bool,
 
-    #[arg(long, default_value = "false")]
+    #[arg(
+        long,
+        default_value = "false",
+        help = "If set, the natural language classifications on the query will be disabled"
+    )]
     disable_classifications: bool,
 }
 
 fn get_args() -> Result<Args, Box<dyn std::error::Error>> {
     let args = Args::parse();
-    if args.issues_only && args.issues_too {
+    if args.api_key == "" {
+        match env::var("OPENAI_API_KEY") {
+            Ok(api_key) => {
+                return Ok(Args { api_key, ..args });
+            }
+            Err(_) => {
+                if args.api_key == "" {
+                    return Err("No API key provided. Set OPENAI_API_KEY as an env var or pass it with the --api-key flag".into());
+                }
+            }
+        }
+    } else if args.issues_only && args.issues_too {
         return Err("Cannot specify both --issues-only and --issues-too".into());
     }
     Ok(args)
@@ -35,7 +66,12 @@ fn get_args() -> Result<Args, Box<dyn std::error::Error>> {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let args = get_args().unwrap();
+    let args = get_args();
+    if let Err(e) = args {
+        println!("\n{}", e);
+        return Ok(());
+    }
+    let args = args.unwrap();
     if !does_command_exist("git")? {
         println!("Git is not installed");
         return Ok(());
