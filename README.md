@@ -4,24 +4,24 @@
 
 [`rust`](https://www.rust-lang.org/tools/install)
 
-## To run
+## To install
 
-Install
+Clone this repository
 
 ```bash
 git clone https://github.com/noahshinn/gitm && cd ./gitm
 ```
 
-Build
+Build and move the binary to /usr/local/bin
 
 ```bash
-cargo build
+sudo make
 ```
 
-Run a search over commits
+Run a search over your commits
 
 ```bash
-./target/release/gitm --query "your query" --api-key <your OpenAI key>
+gitm --query "your query" --api-key <your OpenAI key>
 ```
 
 Other options

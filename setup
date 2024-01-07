@@ -1,0 +1,24 @@
+#!/bin/bash
+
+function cmd_missing() {
+    if command -v "$1" &>/dev/null ; then
+        return 1
+    fi
+    echo "Command missing:" $1
+    return 0
+}
+
+function warn_cmd_and_exit() {
+    echo "Warning: $1 is not installed. $2"
+    exit 1
+}
+
+function assert_cmd_exists() {
+    if cmd_missing "$1" ; then
+        warn_cmd_and_exit "$1" "$2"
+    fi
+}
+
+assert_cmd_exists "cargo" "This project uses cargo and rustc to build its binaries. Please install cargo and rustc at https://www.rust-lang.org/tools/install."
+assert_cmd_exists "git" "git is not installed. Please install it."
+assert_cmd_exists "gh" "gh is not installed. This project uses gh to pull GitHub issues. Please install it at https://cli.github.com/ or https://github.com/cli/cli."
