@@ -28,3 +28,4 @@ Other options
 
 - `--issues-only`: run a search over issues only
 - `--issues-too`: run a joint search over commits and issues
+- `--include-code-patches`: use code diffs from commit patches during search
