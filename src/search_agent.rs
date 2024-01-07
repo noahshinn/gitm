@@ -120,8 +120,8 @@ impl SearchAgent {
                     .await
                     .unwrap();
                 let datetime_classification_result: BinaryClassificationResult<(
-                    DateTime<Utc>,
-                    DateTime<Utc>,
+                    Option<DateTime<Utc>>,
+                    Option<DateTime<Utc>>,
                 )> = self
                     .datetime_mention_classifier
                     .classify(search_config.query.clone())
@@ -138,7 +138,7 @@ impl SearchAgent {
                 }
                 if datetime_classification_result.classification {
                     if let Some((start_date, end_date)) = datetime_classification_result.content {
-                        filter.date_range = Some((Some(start_date), Some(end_date)));
+                        filter.date_range = Some((start_date, end_date));
                     }
                 }
                 filter_config = Some(filter);

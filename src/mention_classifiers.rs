@@ -137,11 +137,16 @@ impl DateTimeMentionClassifier {
             .build();
         Self { raw_classifier }
     }
+}
 
-    pub async fn classify(
+impl BinaryClassifier<(Option<DateTime<Utc>>, Option<DateTime<Utc>>)>
+    for DateTimeMentionClassifier
+{
+    async fn classify(
         &self,
         query: String,
-    ) -> Result<BinaryClassificationResult<(DateTime<Utc>, DateTime<Utc>)>, ChatError> {
+    ) -> Result<BinaryClassificationResult<(Option<DateTime<Utc>>, Option<DateTime<Utc>>)>, ChatError>
+    {
         let result = self.raw_classifier.raw_classification(query).await;
         #[derive(Debug, Serialize, Deserialize)]
         struct RawResult {
@@ -154,12 +159,38 @@ impl DateTimeMentionClassifier {
                 let result =
                     serde_json::from_str::<RawResult>(tool_call.function.arguments.as_str());
                 match result {
-                    Ok(_) => {
-                        // todo!("Convert RawResult to BinaryClassificationResult<(DateTime<Local>, DateTime<Local>)>")
-                        Ok(BinaryClassificationResult {
-                            classification: false,
-                            content: None,
-                        })
+                    Ok(result) => {
+                        if result.classification {
+                            match (result.since, result.until) {
+                                (Some(since), Some(until)) => {
+                                    let since = parse_datetime(since.as_str());
+                                    let until = parse_datetime(until.as_str());
+                                    let mut since_datetime: Option<DateTime<Utc>> = None;
+                                    let mut until_datetime: Option<DateTime<Utc>> = None;
+                                    if let Ok(since) = since {
+                                        since_datetime = Some(since);
+                                    }
+                                    if let Ok(until) = until {
+                                        until_datetime = Some(until);
+                                    }
+                                    Ok(BinaryClassificationResult {
+                                        classification: true,
+                                        content: Some((since_datetime, until_datetime)),
+                                    })
+                                }
+                                _ => {
+                                    return Ok(BinaryClassificationResult {
+                                        classification: false,
+                                        content: None,
+                                    })
+                                }
+                            }
+                        } else {
+                            Ok(BinaryClassificationResult {
+                                classification: false,
+                                content: None,
+                            })
+                        }
                     }
                     Err(e) => Err(ChatError::from(e)),
                 }
@@ -167,4 +198,9 @@ impl DateTimeMentionClassifier {
             Err(e) => Err(e),
         }
     }
+}
+
+fn parse_datetime(s: &str) -> Result<DateTime<Utc>, Box<dyn std::error::Error>> {
+    let datetime = DateTime::parse_from_rfc2822(s)?.with_timezone(&Utc);
+    Ok(datetime)
 }
