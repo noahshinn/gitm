@@ -1,14 +1,17 @@
 use crate::classifier::{BinaryClassificationResult, BinaryClassifier, LLMBinaryClassifierContext};
+use crate::git::Author;
 use crate::llm::{ChatError, ChatModel, Property};
-use chrono::{DateTime, Local};
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 
 pub struct AuthorMentionBinaryClassifier {
+    existing_authors: HashSet<Author>,
     raw_classifier: LLMBinaryClassifierContext,
 }
 
 impl AuthorMentionBinaryClassifier {
-    pub fn new(model: ChatModel) -> Self {
+    pub fn new(model: ChatModel, existing_authors: HashSet<Author>) -> Self {
         let instruction =
             String::from("Determine if the user's query is trying to filter by the author.");
         let result_property = (
@@ -22,15 +25,23 @@ impl AuthorMentionBinaryClassifier {
         );
         let raw_classifier = LLMBinaryClassifierContext::builder(model, instruction)
             .result_property(result_property)
-            .additional_information(String::from(
-                "The author name must be an exact match to the author's name in the git log.",
+            .additional_information(format!("## Complete Author List\n{}\n\n*The author name must be an exact match to the author's name in the list above.*", 
+                existing_authors
+                    .iter()
+                    .filter(|author| author.name.is_some())
+                    .map(|author| format!("- {}", author.name.clone().unwrap()))
+                    .collect::<Vec<String>>()
+                    .join("\n")
             ))
             .build();
-        Self { raw_classifier }
+        Self {
+            raw_classifier,
+            existing_authors,
+        }
     }
 }
 
-impl<Author> BinaryClassifier<Author> for AuthorMentionBinaryClassifier {
+impl BinaryClassifier<Author> for AuthorMentionBinaryClassifier {
     async fn classify(
         &self,
         query: String,
@@ -39,15 +50,47 @@ impl<Author> BinaryClassifier<Author> for AuthorMentionBinaryClassifier {
         #[derive(Debug, Serialize, Deserialize)]
         struct RawResult {
             classification: bool,
-            author_name: String,
+            author_name: Option<String>,
         }
         match result {
             Ok(tool_call) => {
                 let result =
                     serde_json::from_str::<RawResult>(tool_call.function.arguments.as_str());
                 match result {
-                    Ok(_) => {
-                        todo!("Convert RawResult to BinaryClassificationResult<Author>")
+                    Ok(result) => {
+                        if result.classification {
+                            match result.author_name {
+                                Some(author_name) => {
+                                    let author = Author {
+                                        name: Some(author_name.clone()),
+                                        email: None,
+                                        username: None,
+                                    };
+                                    if self.existing_authors.contains(&author) {
+                                        Ok(BinaryClassificationResult {
+                                            classification: true,
+                                            content: Some(author),
+                                        })
+                                    } else {
+                                        Ok(BinaryClassificationResult {
+                                            classification: false,
+                                            content: None,
+                                        })
+                                    }
+                                }
+                                None => {
+                                    return Ok(BinaryClassificationResult {
+                                        classification: false,
+                                        content: None,
+                                    })
+                                }
+                            }
+                        } else {
+                            Ok(BinaryClassificationResult {
+                                classification: false,
+                                content: None,
+                            })
+                        }
                     }
                     Err(e) => Err(ChatError::from(e)),
                 }
@@ -98,13 +141,13 @@ impl DateTimeMentionClassifier {
     pub async fn classify(
         &self,
         query: String,
-    ) -> Result<BinaryClassificationResult<(DateTime<Local>, DateTime<Local>)>, ChatError> {
+    ) -> Result<BinaryClassificationResult<(DateTime<Utc>, DateTime<Utc>)>, ChatError> {
         let result = self.raw_classifier.raw_classification(query).await;
         #[derive(Debug, Serialize, Deserialize)]
         struct RawResult {
             classification: bool,
-            since: String,
-            until: String,
+            since: Option<String>,
+            until: Option<String>,
         }
         match result {
             Ok(tool_call) => {
@@ -112,7 +155,11 @@ impl DateTimeMentionClassifier {
                     serde_json::from_str::<RawResult>(tool_call.function.arguments.as_str());
                 match result {
                     Ok(_) => {
-                        todo!("Convert RawResult to BinaryClassificationResult<(DateTime<Local>, DateTime<Local>)>")
+                        // todo!("Convert RawResult to BinaryClassificationResult<(DateTime<Local>, DateTime<Local>)>")
+                        Ok(BinaryClassificationResult {
+                            classification: false,
+                            content: None,
+                        })
                     }
                     Err(e) => Err(ChatError::from(e)),
                 }

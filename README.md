@@ -26,6 +26,7 @@ Run a search over commits
 
 Other options
 
-- `--issues-only`: run a search over issues only
-- `--issues-too`: run a joint search over commits and issues
-- `--include-code-patches`: use code diffs from commit patches during search
+- `--issues-only`: Run a search over issues only.
+- `--issues-too`: Run a joint search over commits and issues.
+- `--include-code-patches`: Use code diffs from commit patches during search.
+- `--disable-classifications`: By default, your query will be parsed for potential filters (expressed in natural language). Set this flag to disable these checks.

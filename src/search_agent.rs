@@ -1,7 +1,7 @@
 use crate::bm25::{BM25Ranker, BM25Retriever};
 use crate::classifier::{BinaryClassificationResult, BinaryClassifier};
 use crate::git;
-use crate::git::{Author, Commit};
+use crate::git::{Author, Commit, FilterConfig};
 use crate::github;
 use crate::github::Issue;
 use crate::llm::ChatModel;
@@ -9,7 +9,7 @@ use crate::mention_classifiers::{AuthorMentionBinaryClassifier, DateTimeMentionC
 use crate::retrievers::Retriever;
 use crate::splitters::PuncSplitter;
 use crate::store::Store;
-use chrono::{DateTime, Local};
+use chrono::{DateTime, Utc};
 use std::collections::HashSet;
 
 pub struct SearchAgent {
@@ -26,6 +26,7 @@ pub struct SearchConfig {
     include_commits: bool,
     include_issues: bool,
     include_code_patches: bool,
+    disable_classifications: bool,
 }
 
 pub struct SearchConfigBuilder {
@@ -34,6 +35,7 @@ pub struct SearchConfigBuilder {
     include_commits: bool,
     include_issues: bool,
     include_code_patches: bool,
+    disable_classifications: bool,
 }
 
 impl SearchConfigBuilder {
@@ -44,6 +46,7 @@ impl SearchConfigBuilder {
             include_commits: true,
             include_issues: false,
             include_code_patches: false,
+            disable_classifications: false,
         }
     }
 
@@ -67,6 +70,11 @@ impl SearchConfigBuilder {
         self
     }
 
+    pub fn disable_classifications(mut self, disable_classifications: bool) -> SearchConfigBuilder {
+        self.disable_classifications = disable_classifications;
+        self
+    }
+
     pub fn build(self) -> SearchConfig {
         SearchConfig {
             query: self.query,
@@ -74,6 +82,7 @@ impl SearchConfigBuilder {
             include_commits: self.include_commits,
             include_issues: self.include_issues,
             include_code_patches: self.include_code_patches,
+            disable_classifications: self.disable_classifications,
         }
     }
 }
@@ -82,7 +91,9 @@ impl SearchAgent {
     pub fn new(model: ChatModel) -> SearchAgent {
         let git_client = git::Client::new();
         let github_client = github::Client::new();
-        let author_mention_classifier = AuthorMentionBinaryClassifier::new(model.clone());
+        let all_authors = git_client.get_all_authors().unwrap().into_iter().collect();
+        let author_mention_classifier =
+            AuthorMentionBinaryClassifier::new(model.clone(), all_authors);
         let datetime_mention_classifier = DateTimeMentionClassifier::new(model.clone());
         SearchAgent {
             git_client,
@@ -101,7 +112,38 @@ impl SearchAgent {
         let mut commit_results: Vec<Commit> = Vec::new();
         let mut issue_results: Vec<Issue> = Vec::new();
         if search_config.include_commits {
-            let all_git_commits = self.git_client.get_all_commits().unwrap();
+            let mut filter_config: Option<FilterConfig> = None;
+            if !search_config.disable_classifications {
+                let author_classification_result: BinaryClassificationResult<Author> = self
+                    .author_mention_classifier
+                    .classify(search_config.query.clone())
+                    .await
+                    .unwrap();
+                let datetime_classification_result: BinaryClassificationResult<(
+                    DateTime<Utc>,
+                    DateTime<Utc>,
+                )> = self
+                    .datetime_mention_classifier
+                    .classify(search_config.query.clone())
+                    .await
+                    .unwrap();
+                let mut filter = FilterConfig {
+                    author: None,
+                    date_range: None,
+                };
+                if author_classification_result.classification {
+                    if let Some(author) = author_classification_result.content {
+                        filter.author = Some(author);
+                    }
+                }
+                if datetime_classification_result.classification {
+                    if let Some((start_date, end_date)) = datetime_classification_result.content {
+                        filter.date_range = Some((Some(start_date), Some(end_date)));
+                    }
+                }
+                filter_config = Some(filter);
+            }
+            let all_git_commits = self.git_client.get_all_commits(filter_config).unwrap();
             // TODO: remove this heavy clone
             let store = Store::from(all_git_commits.clone());
             let commit_retriever = BM25Retriever::new();
@@ -156,20 +198,6 @@ impl SearchAgent {
                 )
                 .unwrap();
         }
-        // let all_authors = self.git_client.get_all_authors().unwrap();
-        // let author_classification_result: BinaryClassificationResult<Author> = self
-        //     .author_mention_classifier
-        //     .classify(query.clone())
-        //     .await
-        //     .unwrap();
-        // let datetime_classification_result: BinaryClassificationResult<(
-        //     DateTime<Local>,
-        //     DateTime<Local>,
-        // )> = self
-        //     .datetime_mention_classifier
-        //     .classify(query.clone())
-        //     .await
-        //     .unwrap();
         Ok((commit_results, issue_results))
     }
 }

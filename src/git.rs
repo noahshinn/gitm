@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
 use std::fmt::{Display, Formatter};
+use std::hash::{Hash, Hasher};
 use std::process::Command;
 use unidiff::PatchSet;
 
@@ -70,16 +71,39 @@ pub struct Author {
     pub email: Option<String>,
 }
 
+impl PartialEq for Author {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+    }
+}
+
+impl Eq for Author {}
+
+impl Hash for Author {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.name.hash(state);
+    }
+}
+
 const DELIMITER: &str = "|||";
 
 const GIT_LOG_PARSE_FIELDS: [&str; 6] = ["%an", "%ae", "%aD", "%s", "%b", "%H"];
+
+#[derive(Debug, Clone)]
+pub struct FilterConfig {
+    pub author: Option<Author>,
+    pub date_range: Option<(Option<DateTime<Utc>>, Option<DateTime<Utc>>)>,
+}
 
 impl Client {
     pub fn new() -> Client {
         Client
     }
 
-    pub fn get_all_commits(&self) -> Result<Vec<Commit>, Box<dyn std::error::Error>> {
+    pub fn get_all_commits(
+        &self,
+        config: Option<FilterConfig>,
+    ) -> Result<Vec<Commit>, Box<dyn std::error::Error>> {
         let format = format!("--pretty=format:{}", GIT_LOG_PARSE_FIELDS.join(DELIMITER));
         let output = Command::new("git")
             .arg("log")
@@ -112,12 +136,32 @@ impl Client {
             let body = parts.next().unwrap().to_string();
             let sha = parts.next().unwrap().to_string();
             let date = DateTime::parse_from_rfc2822(&date_raw)?.with_timezone(&Utc);
+            let author = Author {
+                name: Some(author_name.clone()),
+                username: None,
+                email: author_email.clone(),
+            };
+            if let Some(config) = config.clone() {
+                if let Some(filter_author) = config.author.clone() {
+                    if filter_author != author {
+                        continue;
+                    }
+                }
+                if let Some((date_since, date_after)) = config.date_range.clone() {
+                    if let Some(start_date) = date_since {
+                        if date < start_date {
+                            continue;
+                        }
+                    }
+                    if let Some(end_date) = date_after {
+                        if date > end_date {
+                            continue;
+                        }
+                    }
+                }
+            }
             commits.push(Commit {
-                author: Author {
-                    name: Some(author_name),
-                    username: None,
-                    email: author_email,
-                },
+                author,
                 date,
                 title,
                 body,

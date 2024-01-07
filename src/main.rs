@@ -1,7 +1,4 @@
 use clap::Parser;
-use gitm::bm25::BM25Retriever;
-use gitm::git;
-use gitm::github;
 use gitm::llm::ChatModel;
 use gitm::llm::ChatModelKey::Gpt4;
 use gitm::search_agent::SearchConfigBuilder;
@@ -23,6 +20,9 @@ struct Args {
 
     #[arg(long, default_value = "false")]
     include_code_patches: bool,
+
+    #[arg(long, default_value = "false")]
+    disable_classifications: bool,
 }
 
 fn get_args() -> Result<Args, Box<dyn std::error::Error>> {
@@ -54,6 +54,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .include_commits(!args.issues_only)
         .include_issues(args.issues_too)
         .include_code_patches(args.include_code_patches)
+        .disable_classifications(args.disable_classifications)
         .build();
     let results = search_agent.search(search_config).await.unwrap();
     for result in results.0 {
