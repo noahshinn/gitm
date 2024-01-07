@@ -15,7 +15,6 @@ use std::collections::HashSet;
 pub struct SearchAgent {
     git_client: git::Client,
     github_client: github::Client,
-    model: ChatModel,
     author_mention_classifier: AuthorMentionBinaryClassifier,
     datetime_mention_classifier: DateTimeMentionClassifier,
 }
@@ -98,7 +97,6 @@ impl SearchAgent {
         SearchAgent {
             git_client,
             github_client,
-            model,
             author_mention_classifier,
             datetime_mention_classifier,
         }
