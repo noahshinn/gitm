@@ -4,6 +4,7 @@ use gitm::git;
 use gitm::github;
 use gitm::llm::ChatModel;
 use gitm::llm::ChatModelKey::Gpt4;
+use gitm::search_agent::SearchConfigBuilder;
 use gitm::utils::{does_command_exist, does_valid_git_dir_exist};
 
 #[derive(Parser, Debug)]
@@ -19,6 +20,9 @@ struct Args {
 
     #[arg(long, default_value = "false")]
     issues_too: bool,
+
+    #[arg(long, default_value = "false")]
+    include_code_patches: bool,
 }
 
 fn get_args() -> Result<Args, Box<dyn std::error::Error>> {
@@ -45,16 +49,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let model = ChatModel::new(args.api_key, Gpt4);
     let search_agent = gitm::search_agent::SearchAgent::new(model);
-    let mode = if args.issues_only {
-        gitm::search_agent::SearchMode::Issues
-    } else if args.issues_too {
-        gitm::search_agent::SearchMode::CommitsAndIssues
-    } else {
-        gitm::search_agent::SearchMode::Commits
-    };
-    let results = search_agent.search(args.query, 10, mode).await.unwrap();
+    let search_config = SearchConfigBuilder::new(args.query)
+        .max_num_results(10)
+        .include_commits(!args.issues_only)
+        .include_issues(args.issues_too)
+        .include_code_patches(args.include_code_patches)
+        .build();
+    let results = search_agent.search(search_config).await.unwrap();
     for result in results.0 {
-        println!("commit: {}", result.patch_set);
+        println!("commit: {}", result.title);
     }
     for result in results.1 {
         println!("issue: {}", result.title);

@@ -13,11 +13,53 @@ pub struct Commit {
     pub body: String,
     pub sha: String,
     pub patch_set: PatchSet,
+    pub display_mode: CommitDisplayMode,
+}
+
+#[derive(Debug, Clone)]
+pub enum CommitDisplayMode {
+    Title,
+    Body,
+    TitleAndBody,
+    PatchSetAdd,
+    PatchSetRemove,
+    PatchSetAll,
 }
 
 impl Display for Commit {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}\n\n{}", self.title, self.body)
+        match self.display_mode {
+            CommitDisplayMode::Title => write!(f, "{}", self.title),
+            CommitDisplayMode::Body => write!(f, "{}", self.body),
+            CommitDisplayMode::TitleAndBody => write!(f, "{}\n\n{}", self.title, self.body),
+            CommitDisplayMode::PatchSetAdd => {
+                let mut added_line_content = Vec::<String>::new();
+                for file in self.patch_set.files() {
+                    for hunk in file.hunks() {
+                        for line in hunk.lines() {
+                            if line.is_added() {
+                                added_line_content.push(line.value.clone());
+                            }
+                        }
+                    }
+                }
+                write!(f, "{}", added_line_content.join("\n"))
+            }
+            CommitDisplayMode::PatchSetRemove => {
+                let mut removed_line_content = Vec::<String>::new();
+                for file in self.patch_set.files() {
+                    for hunk in file.hunks() {
+                        for line in hunk.lines() {
+                            if line.is_removed() {
+                                removed_line_content.push(line.value.clone());
+                            }
+                        }
+                    }
+                }
+                write!(f, "{}", removed_line_content.join("\n"))
+            }
+            CommitDisplayMode::PatchSetAll => write!(f, "{}", self.patch_set),
+        }
     }
 }
 
@@ -81,6 +123,7 @@ impl Client {
                 body,
                 sha,
                 patch_set,
+                display_mode: CommitDisplayMode::TitleAndBody,
             })
         }
         commits.reverse();

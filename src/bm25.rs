@@ -1,5 +1,6 @@
 use crate::rankers::{Ranker, RankingResult};
 use crate::retrievers::Retriever;
+use crate::splitters::{Splitter, WhitespaceSplitter};
 use crate::store::Store;
 use std::collections::BinaryHeap;
 use std::fmt::Display;
@@ -63,10 +64,6 @@ impl BM25Ranker<'_> {
     }
 }
 
-pub trait Splitter {
-    fn split(&self, s: String) -> Vec<String>;
-}
-
 fn doc_score<T, U>(
     doc: U,
     query: T,
@@ -98,25 +95,6 @@ where
         score += idf * num / denom;
     }
     score
-}
-
-struct WhitespaceSplitter;
-
-impl Splitter for WhitespaceSplitter {
-    fn split(&self, s: String) -> Vec<String> {
-        s.to_string()
-            .split_whitespace()
-            .map(|s| s.to_string())
-            .collect()
-    }
-}
-
-struct CharSplitter;
-
-impl Splitter for CharSplitter {
-    fn split(&self, s: String) -> Vec<String> {
-        s.to_string().chars().map(|c| c.to_string()).collect()
-    }
 }
 
 impl<T, U> Ranker<T, U> for BM25Ranker<'_>

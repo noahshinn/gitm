@@ -1,3 +1,4 @@
+use regex::Regex;
 use std::path::Path;
 use std::process::Command;
 
@@ -31,4 +32,9 @@ pub fn does_command_exist(command: &str) -> Result<bool, Box<dyn std::error::Err
         Ok(output) => Ok(output.status.success() && !String::from_utf8(output.stdout)?.is_empty()),
         Err(err) => Err(Box::new(err)),
     }
+}
+
+pub fn split_on_punc_and_whitespace(s: &str) -> Vec<&str> {
+    let re = Regex::new(r"[[:punct:]\s\n]+").unwrap();
+    re.split(s).collect()
 }
