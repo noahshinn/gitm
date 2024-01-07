@@ -1,5 +1,6 @@
 pub mod bm25;
 pub mod classifier;
+pub mod fmt;
 pub mod git;
 pub mod github;
 pub mod llm;

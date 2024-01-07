@@ -1,3 +1,4 @@
+use crate::fmt::{colorize_string, indent_string, Color};
 use chrono::{DateTime, Utc};
 use std::fmt::{Display, Formatter};
 use std::hash::{Hash, Hasher};
@@ -15,6 +16,34 @@ pub struct Commit {
     pub sha: String,
     pub patch_set: PatchSet,
     pub display_mode: CommitDisplayMode,
+}
+
+impl Commit {
+    pub fn mock_git_log_fmt(&self) -> String {
+        format!(
+            "{}
+Author: {}{}
+Date: {}
+
+{}",
+            colorize_string(format!("commit {}", self.sha).as_str(), Color::Yellow),
+            self.author.name.clone().unwrap_or("".to_string()),
+            self.author
+                .email
+                .as_ref()
+                .map_or_else(|| "".to_string(), |email| format!(" <{}>", email)),
+            self.date.to_rfc2822(),
+            format!(
+                "{}{}",
+                indent_string(self.title.as_str(), 4),
+                if self.body != "" {
+                    indent_string(format!("\n\n{}", self.body).as_str(), 4)
+                } else {
+                    "".to_string()
+                }
+            )
+        )
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -131,10 +160,10 @@ impl Client {
                 "" => None,
                 email => Some(email.to_string()),
             };
-            let date_raw = parts.next().unwrap().to_string();
-            let title = parts.next().unwrap().to_string();
-            let body = parts.next().unwrap().to_string();
-            let sha = parts.next().unwrap().to_string();
+            let date_raw = parts.next().unwrap().trim().to_string();
+            let title = parts.next().unwrap().trim().to_string();
+            let body = parts.next().unwrap().trim().to_string();
+            let sha = parts.next().unwrap().trim().to_string();
             let date = DateTime::parse_from_rfc2822(&date_raw)?.with_timezone(&Utc);
             let author = Author {
                 name: Some(author_name.clone()),

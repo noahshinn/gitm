@@ -1,3 +1,4 @@
+use crate::fmt::{colorize_string, Color};
 use crate::git::Author;
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
@@ -11,6 +12,17 @@ pub struct Issue {
     pub author: Author,
     pub created_at: DateTime<Utc>,
     pub number: u64,
+}
+
+impl Issue {
+    pub fn mock_gh_issue_fmt(&self) -> String {
+        format!(
+            "{:<5} {:<90} {:<20}",
+            colorize_string(format!("#{}", self.number).as_str(), Color::Green),
+            self.title,
+            colorize_string(self.created_at.to_rfc2822().as_str(), Color::Grey),
+        )
+    }
 }
 
 impl Display for Issue {

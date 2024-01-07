@@ -92,12 +92,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .include_code_patches(args.include_code_patches)
         .disable_classifications(args.disable_classifications)
         .build();
-    let results = search_agent.search(search_config).await.unwrap();
-    for result in results.0 {
-        println!("commit: {}", result.title);
+    let (commits, issues) = search_agent.search(search_config).await.unwrap();
+    for commit in commits {
+        println!("{}", commit.mock_git_log_fmt());
     }
-    for result in results.1 {
-        println!("issue: {}", result.title);
+    for issue in issues {
+        println!("{}", issue.mock_gh_issue_fmt());
     }
     Ok(())
 }
