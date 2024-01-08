@@ -137,7 +137,7 @@ impl SearchAgent {
                 let mut filter = FilterConfig {
                     author: None,
                     date_range: None,
-                    git_log_get_all: Some(search_config.search_all),
+                    git_log_get_all: search_config.search_all,
                 };
                 if author_classification_result.classification {
                     if let Some(author) = author_classification_result.content {

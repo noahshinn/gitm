@@ -118,12 +118,13 @@ const DELIMITER: &str = "|||";
 
 const GIT_LOG_PARSE_FIELDS: [&str; 6] = ["%an", "%ae", "%aD", "%s", "%b", "%H"];
 const DEFAULT_GIT_LOG_SINCE: &str = "3 months ago";
+const MIN_LARGE_GIT_REPO_NUM_COMMITS: usize = 1000;
 
 #[derive(Debug, Clone)]
 pub struct FilterConfig {
     pub author: Option<Author>,
     pub date_range: Option<(Option<DateTime<Utc>>, Option<DateTime<Utc>>)>,
-    pub git_log_get_all: Option<bool>,
+    pub git_log_get_all: bool,
 }
 
 impl Client {
@@ -131,23 +132,34 @@ impl Client {
         Client
     }
 
+    pub fn get_number_of_commits(&self) -> Result<usize, Box<dyn std::error::Error>> {
+        let output = Command::new("git")
+            .arg("rev-list")
+            .arg("--count")
+            .arg("HEAD")
+            .output()?;
+        if !output.status.success() {
+            return Err("Failed to get git rev-list".into());
+        }
+        let stdout = String::from_utf8(output.stdout)?;
+        let count = stdout.trim().parse::<usize>()?;
+        Ok(count)
+    }
+
     pub fn get_all_commits(
         &self,
         config: Option<FilterConfig>,
     ) -> Result<Vec<Commit>, Box<dyn std::error::Error>> {
         let format = format!("--pretty=format:{}", GIT_LOG_PARSE_FIELDS.join(DELIMITER));
-        let mut since: Option<&str> = Some(DEFAULT_GIT_LOG_SINCE);
-        if let Some(config) = &config {
-            if let Some(git_log_get_all) = config.git_log_get_all {
-                if git_log_get_all {
-                    since = None;
-                }
-            }
-        }
         let mut binding = Command::new("git");
         let cmd = binding.arg("log").arg("-uz").arg(format);
-        if let Some(since) = since {
-            cmd.arg(format!("--since=\"{}\"", since));
+        if let Some(config) = &config {
+            if !config.git_log_get_all {
+                let num_commits = self.get_number_of_commits()?;
+                if num_commits > MIN_LARGE_GIT_REPO_NUM_COMMITS {
+                    cmd.arg(format!("--since=\"{}\"", DEFAULT_GIT_LOG_SINCE));
+                }
+            }
         }
         let output = cmd.output()?;
         if !output.status.success() {

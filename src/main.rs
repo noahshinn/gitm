@@ -98,6 +98,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .include_issues(args.issues_too)
         .include_code_patches(args.include_code_patches)
         .disable_classifications(args.disable_classifications)
+        .search_all(args.all)
         .build();
     let (commits, issues) = search_agent.search(search_config).await.unwrap();
     for commit in commits {
