@@ -117,11 +117,13 @@ impl Hash for Author {
 const DELIMITER: &str = "|||";
 
 const GIT_LOG_PARSE_FIELDS: [&str; 6] = ["%an", "%ae", "%aD", "%s", "%b", "%H"];
+const DEFAULT_GIT_LOG_SINCE: &str = "3 months ago";
 
 #[derive(Debug, Clone)]
 pub struct FilterConfig {
     pub author: Option<Author>,
     pub date_range: Option<(Option<DateTime<Utc>>, Option<DateTime<Utc>>)>,
+    pub git_log_get_all: Option<bool>,
 }
 
 impl Client {
@@ -134,25 +136,38 @@ impl Client {
         config: Option<FilterConfig>,
     ) -> Result<Vec<Commit>, Box<dyn std::error::Error>> {
         let format = format!("--pretty=format:{}", GIT_LOG_PARSE_FIELDS.join(DELIMITER));
-        let output = Command::new("git")
-            .arg("log")
-            .arg("-uz")
-            .arg(format)
-            .output()?;
+        let mut since: Option<&str> = Some(DEFAULT_GIT_LOG_SINCE);
+        if let Some(config) = &config {
+            if let Some(git_log_get_all) = config.git_log_get_all {
+                if git_log_get_all {
+                    since = None;
+                }
+            }
+        }
+        let mut binding = Command::new("git");
+        let cmd = binding.arg("log").arg("-uz").arg(format);
+        if let Some(since) = since {
+            cmd.arg(format!("--since=\"{}\"", since));
+        }
+        let output = cmd.output()?;
         if !output.status.success() {
             return Err("Failed to get git log".into());
         }
         let stdout = String::from_utf8(output.stdout)?;
-        let mut commits = Vec::new();
-        for commit_data in stdout.split("\0") {
-            let (udiff_strings, remaining_log) = split_raw_git_log_output(commit_data.to_string());
+        let commit_data_split = stdout.split("\0").collect::<Vec<&str>>();
+        let mut commits = Vec::with_capacity(commit_data_split.len());
+        for commit_data in commit_data_split {
+            let (udiff_strings, remaining_log) = split_raw_git_log_output(commit_data);
             if udiff_strings.is_empty() || remaining_log.is_empty() {
                 continue;
             }
             let mut patch_set = PatchSet::new();
             patch_set.parse(udiff_strings.join("\n")).unwrap();
-            let mut parts = remaining_log.split(DELIMITER);
-            if parts.clone().count() != GIT_LOG_PARSE_FIELDS.len() {
+            let mut parts = remaining_log
+                .split(DELIMITER)
+                .collect::<Vec<&str>>()
+                .into_iter();
+            if parts.len() != GIT_LOG_PARSE_FIELDS.len() {
                 continue;
             }
             let author_name = parts.next().unwrap().to_string();
@@ -166,17 +181,17 @@ impl Client {
             let sha = parts.next().unwrap().trim().to_string();
             let date = DateTime::parse_from_rfc2822(&date_raw)?.with_timezone(&Utc);
             let author = Author {
-                name: Some(author_name.clone()),
+                name: Some(author_name),
                 username: None,
-                email: author_email.clone(),
+                email: author_email,
             };
-            if let Some(config) = config.clone() {
-                if let Some(filter_author) = config.author.clone() {
-                    if filter_author != author {
+            if let Some(config) = &config {
+                if let Some(filter_author) = &config.author {
+                    if filter_author != &author {
                         continue;
                     }
                 }
-                if let Some((date_since, date_after)) = config.date_range.clone() {
+                if let Some((date_since, date_after)) = config.date_range {
                     if let Some(start_date) = date_since {
                         if date < start_date {
                             continue;
@@ -197,7 +212,7 @@ impl Client {
                 sha,
                 patch_set,
                 display_mode: CommitDisplayMode::TitleAndBody,
-            })
+            });
         }
         commits.reverse();
         Ok(commits)
@@ -233,15 +248,15 @@ impl Client {
     }
 }
 
-fn split_raw_git_log_output(s: String) -> (Vec<String>, String) {
-    let mut udiff_strings = Vec::new();
-    let mut current_udiff = String::new();
+fn split_raw_git_log_output(s: &str) -> (Vec<String>, String) {
+    let mut udiff_strings = Vec::with_capacity(s.matches("diff --git").count());
+    let mut current_udiff = String::with_capacity(s.len());
     let mut in_udiff = false;
-    let mut remaining_log = String::new();
+    let mut remaining_log = String::with_capacity(s.len());
     for line in s.lines() {
         if line.starts_with("diff --git") {
             if in_udiff && !current_udiff.is_empty() {
-                udiff_strings.push(current_udiff.clone());
+                udiff_strings.push(std::mem::take(&mut current_udiff));
                 current_udiff.clear();
             }
             in_udiff = true;

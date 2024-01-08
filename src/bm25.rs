@@ -64,10 +64,10 @@ impl BM25Ranker<'_> {
     }
 }
 
-fn doc_score<T, U>(
-    doc: U,
-    query: T,
-    corpus: &Vec<U>,
+fn doc_score<T>(
+    doc: T,
+    query_terms: &Vec<String>,
+    corpus: &Vec<T>,
     splitter: &dyn Splitter,
     avg_doc_len: f64,
     k1: f64,
@@ -75,10 +75,8 @@ fn doc_score<T, U>(
 ) -> f64
 where
     T: Display + Clone,
-    U: Display + Clone,
 {
-    let query_terms = splitter.split(query.to_string());
-    let doc_terms = splitter.split(doc.to_string());
+    let doc_terms = splitter.split(doc.to_string().as_str());
     let mut score = 0.0;
     for q_i in query_terms.iter() {
         let idf = idf(q_i.as_str(), corpus);
@@ -109,14 +107,15 @@ where
     ) -> Result<Vec<RankingResult<U>>, Box<dyn std::error::Error>> {
         let mut total_doc_len = 0;
         for doc in corpus.iter() {
-            total_doc_len += self.splitter.split(doc.to_string()).len();
+            total_doc_len += self.splitter.split(doc.to_string().as_str()).len();
         }
         let avg_doc_len = total_doc_len as f64 / corpus.len() as f64;
         let mut heap = BinaryHeap::<RankingResult<U>>::new();
+        let query_terms = self.splitter.split(query.to_string().as_str());
         for doc in corpus.iter() {
             let score = doc_score(
                 doc.clone(),
-                query.clone(),
+                &query_terms,
                 &corpus,
                 self.splitter,
                 avg_doc_len,
@@ -128,7 +127,7 @@ where
                 item: doc.clone(),
             });
         }
-        let mut ranked_results = Vec::<RankingResult<U>>::new();
+        let mut ranked_results = Vec::<RankingResult<U>>::with_capacity(heap.len());
         while let Some(result) = heap.pop() {
             ranked_results.push(result);
         }
@@ -203,7 +202,7 @@ where
         max_num_results: usize,
     ) -> Result<Vec<U>, Box<dyn std::error::Error>> {
         let ranked_results = self.ranker.rank(query, store.data)?;
-        let mut results = Vec::new();
+        let mut results = Vec::with_capacity(ranked_results.len());
         for result in ranked_results {
             if results.len() >= max_num_results {
                 break;

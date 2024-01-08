@@ -22,3 +22,7 @@ function assert_cmd_exists() {
 assert_cmd_exists "cargo" "This project uses cargo and rustc to build its binaries. Please install cargo and rustc at https://www.rust-lang.org/tools/install."
 assert_cmd_exists "git" "git is not installed. Please install it."
 assert_cmd_exists "gh" "gh is not installed. This project uses gh to pull GitHub issues. Please install it at https://cli.github.com/ or https://github.com/cli/cli."
+
+if [ ! -d "./unidiff-rs" ]; then
+    git submodule update --init --recursive
+fi

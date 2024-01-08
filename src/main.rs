@@ -43,6 +43,13 @@ struct Args {
         help = "If set, the natural language classifications on the query will be disabled"
     )]
     disable_classifications: bool,
+
+    #[arg(
+        long,
+        default_value = "false",
+        help = "If set, the search will be performed on all (issues or commits); by default, the last 2 months of data are searched."
+    )]
+    all: bool,
 }
 
 fn get_args() -> Result<Args, Box<dyn std::error::Error>> {

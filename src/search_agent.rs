@@ -26,6 +26,7 @@ pub struct SearchConfig {
     include_issues: bool,
     include_code_patches: bool,
     disable_classifications: bool,
+    search_all: bool,
 }
 
 pub struct SearchConfigBuilder {
@@ -35,6 +36,7 @@ pub struct SearchConfigBuilder {
     include_issues: bool,
     include_code_patches: bool,
     disable_classifications: bool,
+    search_all: bool,
 }
 
 impl SearchConfigBuilder {
@@ -46,6 +48,7 @@ impl SearchConfigBuilder {
             include_issues: false,
             include_code_patches: false,
             disable_classifications: false,
+            search_all: false,
         }
     }
 
@@ -74,6 +77,11 @@ impl SearchConfigBuilder {
         self
     }
 
+    pub fn search_all(mut self, search_all: bool) -> SearchConfigBuilder {
+        self.search_all = search_all;
+        self
+    }
+
     pub fn build(self) -> SearchConfig {
         SearchConfig {
             query: self.query,
@@ -82,6 +90,7 @@ impl SearchConfigBuilder {
             include_issues: self.include_issues,
             include_code_patches: self.include_code_patches,
             disable_classifications: self.disable_classifications,
+            search_all: self.search_all,
         }
     }
 }
@@ -128,6 +137,7 @@ impl SearchAgent {
                 let mut filter = FilterConfig {
                     author: None,
                     date_range: None,
+                    git_log_get_all: Some(search_config.search_all),
                 };
                 if author_classification_result.classification {
                     if let Some(author) = author_classification_result.content {
@@ -142,7 +152,6 @@ impl SearchAgent {
                 filter_config = Some(filter);
             }
             let all_git_commits = self.git_client.get_all_commits(filter_config).unwrap();
-            // TODO: remove this heavy clone
             let store = Store::from(all_git_commits.clone());
             let commit_retriever = BM25Retriever::new();
             commit_results = commit_retriever

@@ -12,6 +12,12 @@ Clone this repository
 git clone https://github.com/noahshinn/gitm && cd ./gitm
 ```
 
+Initialize and update submodules
+
+```bash
+git submodule update --init --recursive
+```
+
 Build and move the binary to /usr/local/bin
 
 ```bash
